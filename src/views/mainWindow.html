@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>NuclearLedger</title>
+    <link rel="stylesheet" href="https://bootswatch.com/4/slate/bootstrap.min.css">
+    <script>
+        delete module.exports
+    </script>
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="../../index.js" type="text/javascript"></script>
+    <script src="../../src/controllers/MainWindowController.js" type="text/javascript"></script>
+</head>
+
+<body>
+    <h1>
+        MainWindow
+    </h1>
+
+    <table class="table table-hover" id="table-hover-main">
+        <thead>
+        </thead>
+        <tbody>
+            <tr class="table-secondary tube">
+                <th scope="row">Tube</th>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+    <script>
+        // Event listener
+        $(document).ready(function() {
+            $('#table-hover-main').on('click', 'tr', function() {
+                console.log('Sending tube id: '+$(this).attr('id'));
+                ipcRenderer.send('tubeclick', $(this).attr('id'));
+            });
+        });
+
+        //SQL Connection
+
+
+        connection.query('select (ID_Aquired_Tubes) from Aquired_Tubes;', function (error, qResults, fields) {
+        if (error) throw error;
+        console.log('The solution is: ', qResults[0].ID_Aquired_Tubes);
+
+        // Display of query
+
+        console.log('Length: '+Object.keys(qResults).length);
+        for(var i=0; i<Object.keys(qResults).length; i++) {
+            $('#table-hover-main').append('<tr class="table-secondary-tube" id="'+qResults[i].ID_Aquired_Tubes+'">'+'<th scope="row">Tube '+qResults[i].ID_Aquired_Tubes+'</th>'+'<td></td>'+'</tr>');
+        }
+
+        });
+    </script>
+</body>
+
+</html>

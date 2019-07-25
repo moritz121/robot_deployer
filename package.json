@@ -1,0 +1,25 @@
+{
+  "name": "robotdeployer",
+  "version": "1.0.0",
+  "description": "Deployer of robots to execute simulation of analisys of tubes",
+  "main": "index.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "gcloud app deploy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moritz121/robot_deployer.git"
+  },
+  "dependencies": {
+    "electron": "^5.0.6",
+    "mysql": "^2.17.1"
+  },
+  "author": "Moritz121",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/moritz121/robot_deployer/issues"
+  },
+  "homepage": "https://github.com/moritz121/robot_deployer#readme"
+}
