@@ -1,11 +1,34 @@
 const electron = require('electron');
 const url = require('url');
 const path = require ('path');
-
+const os = require('os');
+const mysql = require('mysql');
+const {Worker, isMainThread, parentPort, workerData} = require('worker_threads');
 const{app, BrowserWindow, Menu, ipcMain} = electron;
-let mainWindow;
+const NS_PER_SEC = 1e9;
+
+// SQL Connection
+
+const connection = mysql.createConnection({
+    host: '34.77.222.32',
+    user: 'root',
+    password: 'root',
+    database: 'db_nuclear_analisys'
+    });
+
+connection.connect(function(err) {
+if (err) {
+    console.error('error connecting: ' + err.stack);
+    return;
+}
+
+console.log('connected as id ' + connection.threadId);
+});
+
+callWorkers(1);
 
 // Main Window
+let mainWindow;
 const startingWindow = 'src/views/mainWindow.html';
 
 // Listen for app to be opened
@@ -16,7 +39,9 @@ if(app!=undefined) {
         
         mainWindow = new BrowserWindow({
             webPreferences: {
-                nodeIntegration: true
+                nodeIntegration: true,
+                nodeIntegrationInWorker: true,
+                sandbox: false
             }
         });
 
@@ -28,33 +53,9 @@ if(app!=undefined) {
             protocol: 'file:',
             slashes: true
         }));
- /*       
-        ipcMain.on('tubeclick', (e, id) => {
-            console.log(`El id es: ${id}`);
-            mainWindow = null;
-        
-            mainWindow = new BrowserWindow({
-                webPreferences: {
-                    nodeIntegration: true
-                }
-            });
 
-            mainWindow.webContents.loadURL(url.format({
-                pathname: path.join(__dirname, 'src/views/calendarWindow.html'),
-                protocol: 'file:',
-                slashes: true
-            }), {"extraHeaders" : "pragma: no-cache\n"} );
-        
-            ipcMain.on('requestCurrentTube', (event) => {
-                console.log('Responding with Current Tube: '+id);
-                event.sender.send('responseRequestCurrentTube', id);
-            });
-        
-        });        
-*/
         const mainMenu = Menu.buildFromTemplate(mainMenuTemplate);
         Menu.setApplicationMenu(mainMenu);
-        require('./src/controllers/MainWindowController');
 
     });
 
@@ -76,26 +77,15 @@ const mainMenuTemplate = [
         }
     },
     {
-
-        label:'Options',
-        submenu:[
-            { 
-                label: 'Change User',
-                click() {
-                    mainWindow.loadURL(url.format({
-                        pathname: path.join(__dirname, 'src/views/changeUserWindow.html'),
-                        protocol: 'file',
-                        slashes: true
-                    }));
-                }
-            },
-        ]
-
-    },
-    {
         label: 'Reload',
         click() {
             mainWindow.webContents.reloadIgnoringCache();
+        }
+    },
+    {
+        label: 'Work_debug',
+        click() {
+            callWorkers(1);
         }
     },
     {
@@ -106,67 +96,118 @@ const mainMenuTemplate = [
     }
 ];
 
-// IPCRenderer
-
-if(ipcMain!=undefined) {
+// Message Exchange
 
 
-ipcMain.on('tubeclick', (e, id) => {
-    console.log(`El id es: ${id}`);
-    let mainWindow = BrowserWindow.getFocusedWindow();
+// Workers 
 
-    mainWindow.webContents.loadURL(url.format({
-        
-        pathname: path.join(__dirname, 'src/views/calendarWindow.html'),
-        protocol: 'file:',
-        slashes: true
-    }), {"extraHeaders" : "pragma: no-cache\n"} );
+function callWorkers(nWorkers) {
 
-    ipcMain.on('requestCurrentTube', (event) => {
-        console.log('Responding with Current Tube: '+id);
-        event.sender.send('responseRequestCurrentTube', id);
+    let tubeArray = [];
+    let workerIndex = 1;
+
+    connection.query('select (ID_Tube) from Tube;', function (error, results, fields) {
+        if (error) throw error;
+
+        // Convert query results into array for posterior transformation
+
+        for(let i = 0; i<Object.keys(results).length; i++) {
+            tubeArray.push(results[i].ID_Tube);
+        }
+
+    connection.end();
     });
 
-});
+    //Simulate the adquisition of the tubes
 
-
-ipcMain.on('userclick', (e, id) => {
-
-    console.log(`Cambiado usuario a: ${id}`);
+    const simulateAdquisition = async (tubeArray, nWorkers) => { 
+        return new Promise(async (parentResolve, parentReject) => {
     
-    ipcMain.on('requestCurrentUser', (event) => {
-        event.sender.send('responseRequestCurrentUser', id);
-    });
-
-});
-
-ipcMain.on('analyzedTubeclick', (e, id) => {
-
-    var secondarywin = new BrowserWindow({width:600, height:800, webPreferences: {nodeIntegration: true} });
-    secondarywin.webContents.openDevTools();
-    secondarywin.loadURL(url.format({
-        pathname: path.join(__dirname, 'src/views/analyzedTubeWindow.html'),
-        protocol: 'file:',
-        slashes: true
-    }));
+            console.log('first promisse');
+            workerPath = path.resolve(__dirname, 'adquisitionWorker.js');
+            workLoadLength = Math.ceil(tubeArray.length / nWorkers);
+            workLoads = [];
     
-    ipcMain.on('requestAnalyzedTubeId', (event) => {
-        console.log('Analyzed Tube Init Id has been sent with id: '+id);
-        event.sender.send('responseRequestAnalyzedTubeId', id);
-    });
+            for(let i = 0; i < nWorkers; i++) {
+                pos = i*workLoadLength;
+                let workLoad = tubeArray.slice(pos, pos + workLoadLength, workLoadLength);
+                workLoads.push(workLoad);
+            }
+    
+            var electronWorkers = require('electron-workers')({
+                connectionMode: 'ipc',
+                pathToScript: 'adquisitionWorker.js',
+                timeout: 5000,
+                numberOfWorkers: 1
+            });
 
-});
+            try {
+                const workResults = await Promise.all(workLoads.map(load => new Promise((resolve, reject) => {
+                    load.push(workerIndex);
+                    console.log(load);
+                    workerIndex++;
+                    
+                    process.dlopen = () => {
+                        throw new Error('La carga del módulo nativo no es segura')
+                    }
+    /*
+                    const worker = new ElectronWorker(workerPath, {
+                        workerData: load
+                    });
+    */
+                    //Copiado
+                    
+                    electronWorkers.start(function(startErr) {
+                        if (startErr) {
+                        return console.error(startErr);
+                        }
+                    
+                        // `electronWorkers` will send your data in a POST request to your electron script
+                        electronWorkers.execute({ someData: 'someData' }, function(err, data) {
+                        if (err) {
+                            return console.error(err);
+                        }
+                    
+                        console.log(JSON.stringify(data)); // { someData: 'someData' }
+                        electronWorkers.kill(); // kill all workers explicitly
+                        });
+                    });
 
-ipcMain.on('requestNewAnalisys', (event) => {
-    let mainWindow = BrowserWindow.getFocusedWindow();
-    mainWindow.loadURL(url.format({
-        pathname: path.join(__dirname, 'src/views/newAnalisysWindow.html'),
-        protocol: 'file:',
-        slashes: true
-    }));    
-}); 
+                    // Fin copiado
 
-module.exports = ipcMain;
+                    process.send("data", load);
+                    process.on("mesage", resolve);
+                    process.on("error", reject);
+                    process.on("exit", (code) => {
+                        if(code!=0) {
+                            reject(new Error(`Worker stoped with exit code ${code}`));
+                        }
+                    }); 
+
+                    console.log(resolve); 
+                    parentResolve(resolve);
+
+                })));
+            } catch (e) {parentReject(e);}
+            
+            
+
+
+        }); 
+    }
+
+    // Time calculation
+
+    const benchmarkFunc = async (func, input1, input2) => {
+        const tStart = process.hrtime();
+        const tWork = await func(input1, input2); 
+        const tDiff = process.hrtime(tStart); 
+        const t = tDiff[0] * NS_PER_SEC + tDiff[1];
+        return t;
+    }
+
+    const benchmarkTime = await benchmarkFunc(simulateAdquisition, tubeArray, nWorkers);
+    console.log('Time is:' + Math.floot(benchmarkTime/1000000) + 'ms');
 
 }
 
