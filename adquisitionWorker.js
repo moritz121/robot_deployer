@@ -1,16 +1,19 @@
 const {Worker, parentPort, workerData} = require('worker_threads');
 
 // Get working data
-process.on("data", (data) => {
-    console.log("Data: ")
-    console.log(data);
+try {
 
-    process.send("mesage", "done")
+    console.log("Worker started");
 
-});
+    const data = workerData;
 
-// Return results
+    console.log("Processing data -> "+data);
 
-let result = 1;
+    // Return results
 
-parentPort.postMessage(result);
+    let result = 1;
+    parentPort.postMessage(result);
+
+} catch(err){
+    parentPort.postMessage({'error': err});
+}

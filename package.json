@@ -4,7 +4,7 @@
   "description": "Deployer of robots to execute simulation of analisys of tubes",
   "main": "index.js",
   "scripts": {
-    "start": "electron --experimental-worker index.js",
+    "start": "electron index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "deploy": "gcloud app deploy"
   },
@@ -13,11 +13,19 @@
     "url": "git+https://github.com/moritz121/robot_deployer.git"
   },
   "dependencies": {
-    "electron": "^5.0.6",
-    "electron-workers": "^1.10.3",
+    "async": "^3.1.0",
+    "electron": "^5.0.8",
+    "electron-prebuilt": "^1.4.13",
+    "g": "^2.0.1",
     "inquirer": "^6.5.0",
+    "install": "^0.13.0",
+    "latest-version": "^5.1.0",
     "mysql": "^2.17.1",
-    "ora": "^3.4.0"
+    "node": "^10.16.1",
+    "npm-windows-upgrade": "^6.0.1",
+    "ora": "^3.4.0",
+    "update": "^0.7.4",
+    "update-node": "^0.1.0"
   },
   "author": "Moritz121",
   "license": "MIT",

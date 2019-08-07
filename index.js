@@ -1,11 +1,12 @@
 const electron = require('electron');
+const async = require('async');
 const url = require('url');
 const path = require ('path');
 const os = require('os');
 const mysql = require('mysql');
-const {Worker, isMainThread, parentPort, workerData} = require('worker_threads');
-const{app, BrowserWindow, Menu, ipcMain} = electron;
+const  {app, BrowserWindow, Menu, ipcMain} = electron;
 const NS_PER_SEC = 1e9;
+const {Worker, parentPort, workerData, isMainThread} = require('worker_threads');
 
 // SQL Connection
 
@@ -24,8 +25,6 @@ if (err) {
 
 console.log('connected as id ' + connection.threadId);
 });
-
-callWorkers(1);
 
 // Main Window
 let mainWindow;
@@ -83,9 +82,9 @@ const mainMenuTemplate = [
         }
     },
     {
-        label: 'Work_debug',
+        label: 'Test',
         click() {
-            callWorkers(1);
+            benchmarkFunc(1);
         }
     },
     {
@@ -96,118 +95,107 @@ const mainMenuTemplate = [
     }
 ];
 
+// Functions
+
+function queryDB(query) {
+    return new Promise((resolve, reject) => { 
+        connection.query(query, function (error, results, fieldds) {
+            if (error) reject("Query promise rejected -> "+error);
+            resolve(results);    
+        });
+    });
+}
+
 // Message Exchange
+
 
 
 // Workers 
 
-function callWorkers(nWorkers) {
+async function callWorkers(nWorkers) {
 
     let tubeArray = [];
     let workerIndex = 1;
 
-    connection.query('select (ID_Tube) from Tube;', function (error, results, fields) {
-        if (error) throw error;
-
         // Convert query results into array for posterior transformation
+
+        let results = await queryDB('select (ID_Tube) from Tube;');
 
         for(let i = 0; i<Object.keys(results).length; i++) {
             tubeArray.push(results[i].ID_Tube);
         }
 
-    connection.end();
-    });
-
     //Simulate the adquisition of the tubes
+    
+    workerPath = path.resolve('adquisitionWorker.js');
+    workLoadLength = Math.ceil(tubeArray.length / nWorkers);
+    workLoads = [];
 
-    const simulateAdquisition = async (tubeArray, nWorkers) => { 
-        return new Promise(async (parentResolve, parentReject) => {
-    
-            console.log('first promisse');
-            workerPath = path.resolve(__dirname, 'adquisitionWorker.js');
-            workLoadLength = Math.ceil(tubeArray.length / nWorkers);
-            workLoads = [];
-    
-            for(let i = 0; i < nWorkers; i++) {
-                pos = i*workLoadLength;
-                let workLoad = tubeArray.slice(pos, pos + workLoadLength, workLoadLength);
-                workLoads.push(workLoad);
+    for(let i = 0; i < nWorkers; i++) {
+        pos = i*workLoadLength;
+        let workLoad = tubeArray.slice(pos, pos + workLoadLength, workLoadLength);
+        workLoads.push(workLoad);
+    }
+
+    // Worker configuration
+
+    let promisses = workLoads.map(load => new Promise((resolve, reject) => {
+        load.push(workerIndex);
+        workerIndex++;
+        
+        process.dlopen = () => {
+            throw new Error('La carga del módulo nativo no es segura');
+        }
+
+        console.log('1');
+        console.log(load);
+
+        const worker = new Worker(workerPath, {
+            workerData: load
+        });
+
+        console.log('2');
+//        worker.postMessage("Start", load);
+
+        // Fin copiado
+        console.log('3');
+        worker.on("message", resolve);
+        worker.on("error", (error) => {
+            console.log("reject catched -> "+error); 
+            reject(new Error(`Worker stopped by catched error ${error}`));
+        });
+        worker.on("exit", (code) => {
+            if(code!=0) {
+                console.log("reject code -> "+code);
+                reject(new Error(`Worker stoped with exit code ${code}`));
             }
-    
-            var electronWorkers = require('electron-workers')({
-                connectionMode: 'ipc',
-                pathToScript: 'adquisitionWorker.js',
-                timeout: 5000,
-                numberOfWorkers: 1
-            });
+        });
+        console.log('4');   
 
-            try {
-                const workResults = await Promise.all(workLoads.map(load => new Promise((resolve, reject) => {
-                    load.push(workerIndex);
-                    console.log(load);
-                    workerIndex++;
-                    
-                    process.dlopen = () => {
-                        throw new Error('La carga del módulo nativo no es segura')
-                    }
-    /*
-                    const worker = new ElectronWorker(workerPath, {
-                        workerData: load
-                    });
-    */
-                    //Copiado
-                    
-                    electronWorkers.start(function(startErr) {
-                        if (startErr) {
-                        return console.error(startErr);
-                        }
-                    
-                        // `electronWorkers` will send your data in a POST request to your electron script
-                        electronWorkers.execute({ someData: 'someData' }, function(err, data) {
-                        if (err) {
-                            return console.error(err);
-                        }
-                    
-                        console.log(JSON.stringify(data)); // { someData: 'someData' }
-                        electronWorkers.kill(); // kill all workers explicitly
-                        });
-                    });
+    }));
 
-                    // Fin copiado
-
-                    process.send("data", load);
-                    process.on("mesage", resolve);
-                    process.on("error", reject);
-                    process.on("exit", (code) => {
-                        if(code!=0) {
-                            reject(new Error(`Worker stoped with exit code ${code}`));
-                        }
-                    }); 
-
-                    console.log(resolve); 
-                    parentResolve(resolve);
-
-                })));
-            } catch (e) {parentReject(e);}
-            
-            
-
-
-        }); 
-    }
-
-    // Time calculation
-
-    const benchmarkFunc = async (func, input1, input2) => {
-        const tStart = process.hrtime();
-        const tWork = await func(input1, input2); 
-        const tDiff = process.hrtime(tStart); 
-        const t = tDiff[0] * NS_PER_SEC + tDiff[1];
-        return t;
-    }
-
-    const benchmarkTime = await benchmarkFunc(simulateAdquisition, tubeArray, nWorkers);
-    console.log('Time is:' + Math.floot(benchmarkTime/1000000) + 'ms');
+    return Promise.all(promisses).then((values) => {
+        console.log('5');
+        console.log(values);
+        return values;
+    }).catch(() => {
+        console.log("Fetch");
+        return 0;
+    });
 
 }
 
+// Time calculation
+
+async function benchmarkFunc(nWorkers) {
+
+    const tStart = process.hrtime();
+    var variable = await callWorkers(1);
+    console.log('Variable:');
+    console.log(variable);
+    const tDiff = process.hrtime(tStart);
+    const t = tDiff[0] * NS_PER_SEC + tDiff[1];
+
+    console.log('Time is: '+t);
+
+}
