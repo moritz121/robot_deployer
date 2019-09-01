@@ -1,6 +1,9 @@
 const ipcRenderer = require('electron').ipcRenderer;
 
+
 //My SQL Connection and Queries
+
+console.log(`$ this: ${$.this}`);
 
 $(() => { 
 
@@ -9,8 +12,8 @@ $(() => {
     // Event listener
     jQuery(document).ready(function() {
         $table.on('click', 'tr', function() {
-            console.log('Sending tube id: '+$(this).attr('id'));
-            ipcRenderer.send('requestSimulation', $(this).attr('id'));
+            console.log('Resquesting simulation with id: '+$(this).attr('id'));
+            ipcRenderer.send('requestAdquisition', $(this).attr('id'));
         });
     });
 

@@ -11,7 +11,7 @@ try {
 
     // Return results
 
-    let result = 1;
+    let result = 2;
     parentPort.postMessage(result);
 
 } catch(err){

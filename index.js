@@ -1,30 +1,13 @@
-const electron = require('electron');
-const async = require('async');
 const url = require('url');
+const fetch = require("node-fetch");
 const path = require ('path');
-const os = require('os');
+const ora = require('ora');
 const mysql = require('mysql');
-const  {app, BrowserWindow, Menu, ipcMain} = electron;
+const electron = require('electron');
 const NS_PER_SEC = 1e9;
+const request = require('request');
 const {Worker, parentPort, workerData, isMainThread} = require('worker_threads');
-
-// SQL Connection
-
-const connection = mysql.createConnection({
-    host: '34.77.222.32',
-    user: 'root',
-    password: 'root',
-    database: 'db_nuclear_analisys'
-    });
-
-connection.connect(function(err) {
-if (err) {
-    console.error('error connecting: ' + err.stack);
-    return;
-}
-
-console.log('connected as id ' + connection.threadId);
-});
+const  {app, BrowserWindow, Menu, ipcMain} = electron;
 
 // Main Window
 let mainWindow;
@@ -78,14 +61,37 @@ const mainMenuTemplate = [
     {
         label: 'Reload',
         click() {
-            mainWindow.webContents.reloadIgnoringCache();
+  //          mainWindow.webContents.reloadIgnoringCache();
+            mainWindow.loadURL(url.format({
+                pathname: path.join(__dirname, 'src/views/popUp.html'),
+                protocol: 'file:',
+                slashes: true
+            }));
         }
     },
     {
         label: 'Test',
-        click() {
-            benchmarkFunc(1);
-        }
+        submenu: [
+            {
+                label: 'Test adquisition',
+                click() {
+                    console.log("Adquisition requested ->")
+                    userAction();
+                }
+            }, 
+            {
+                label: 'Test analisis',
+                click() {
+                    console.log("Still in developement");
+                }
+            },
+            {
+                label: 'Test resolution',
+                click() {
+                    console.log("Still in developement");
+                }
+            }
+        ]
     },
     {
         label: 'Quit',
@@ -94,6 +100,24 @@ const mainMenuTemplate = [
         }
     }
 ];
+
+// SQL Connection
+
+const connection = mysql.createConnection({
+    host: '34.77.222.32',
+    user: 'root',
+    password: 'root',
+    database: 'db_nuclear_analisys'
+    });
+
+connection.connect(function(err) {
+if (err) {
+    console.error('error connecting: ' + err.stack);
+    return;
+}
+
+console.log('connected as id ' + connection.threadId);
+});
 
 // Functions
 
@@ -105,10 +129,55 @@ function queryDB(query) {
         });
     });
 }
+/*
+const userAction = async () => {
+    console.log("Calling API ->");
+    const response = await fetch('http://localhost:8081/api/adquisition');
+    const myJson = await response.json(); //extract JSON from the http response
+    // do something with myJson
+    console.log(myJson);
+    console.log("REST request ended");
+  }
+*/
+
+const userAction = async () => {
+    console.log("Calling API ->");
+    const response = await fetch('http://localhost:8081/api/adquisition', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify( {options: { nWorkers: 2, tMin: 1000, tMax: 3000, type: 'acquisition'}})
+    });
+    const myJson = await response.json(); //extract JSON from the http response
+    // do something with myJson
+    console.log(myJson);
+    console.log("REST request ended");
+}
 
 // Message Exchange
 
+ipcMain.on("requestAdquisition", (e) => {
 
+    var secondarywin = new BrowserWindow({width:600, height:800, webPreferences: {nodeIntegration: true} });
+    secondarywin.webContents.openDevTools();
+    secondarywin.loadURL(url.format({
+        pathname: path.join(__dirname, 'src/views/popUp.html'),
+        protocol: 'file:',
+        slashes: true
+    }));
+
+    ipcMain.on("reqiestAdquisitionSimulation", (e, args) => {
+
+        console.log(`Test arguments for simulation being: ${args}`);
+
+    });
+
+//    console.log("Adquisition requested ->")
+//    userAction();
+
+});
 
 // Workers 
 
@@ -143,6 +212,8 @@ async function callWorkers(nWorkers) {
         load.push(workerIndex);
         workerIndex++;
         
+    console.log("Hello");
+
         process.dlopen = () => {
             throw new Error('La carga del módulo nativo no es segura');
         }
@@ -189,13 +260,54 @@ async function callWorkers(nWorkers) {
 
 async function benchmarkFunc(nWorkers) {
 
+    const spinner = ora(`Calculating...`).start();
     const tStart = process.hrtime();
     var variable = await callWorkers(1);
     console.log('Variable:');
     console.log(variable);
     const tDiff = process.hrtime(tStart);
     const t = tDiff[0] * NS_PER_SEC + tDiff[1];
-
-    console.log('Time is: '+t);
+     spinner.succeed(`Result done in: ${t}`);
 
 }
+
+
+/*
+const run = async () => {
+    console.log("Hi?");
+  const {inputNumber} = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'inputNumber',
+      message: 'Deploy workers:',
+      default: 1,
+    },
+  ]);
+
+    console.log("Start benchmarking");
+    const tDeploy = await benchmarkFunc(inputNumber);
+    console.log(`tDeploy -> ${tDeploy}`);
+
+}
+
+run();
+*/
+
+
+/*
+console.log("calling");
+const userAction = async () => {
+    console.log("hi");
+    const response = await fetch('https://us-central1-client-server-tfg.cloudfunctions.net/adquisitionWorker/api/one');
+    console.log(`response -> ${response}`);
+    console.log(response);
+    const myJson = await response.json(); //extract JSON from the http response
+    // do something with myJson
+    console.log(myJson);
+  }
+
+
+  console.log("const");
+  userAction();
+
+  */
