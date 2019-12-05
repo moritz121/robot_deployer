@@ -13,7 +13,7 @@ $(() => {
     jQuery(document).ready(function() {
         $table.on('click', 'tr', function() {
             console.log('Resquesting simulation with id: '+$(this).attr('id'));
-            ipcRenderer.send('requestAdquisition', $(this).attr('id'));
+            ipcRenderer.send('requestSimulation', $(this).attr('id'));
         });
     });
 

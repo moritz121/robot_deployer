@@ -3,6 +3,9 @@
 
 <head>
     <title>NuclearLedger</title>
+    <script>
+        delete module.exports
+    </script>
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
     <script src="../../src/controllers/mainWindowController.js" type="text/javascript"></script>
     <link rel="stylesheet" href="https://bootswatch.com/4/slate/bootstrap.min.css">
@@ -20,8 +23,14 @@
             <tr class="table-secondary tube">
                 <th scope="row">Simulations</th>
             </tr>
-            <tr class="table-secondary-tube" >
-                <th scope="row">Adquisition simulation</th>
+            <tr class="table-secondary-tube" id="Acquisition">
+                <th scope="row">Acquisition simulation</th>
+            </tr>
+            <tr class="table-secondary-tube" id="Analysis">
+                <th scope="row">Analysis simulation</th>
+            </tr>
+            <tr class="table-secondary-tube" id="Resolution">
+                <th scope="row">Resolution simulation</th>
             </tr>
         </tbody>
     </table>
