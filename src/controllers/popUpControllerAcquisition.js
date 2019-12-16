@@ -24,7 +24,7 @@ $(() => {
             tMin = $tMinInput.val();
             tMax = $tMaxInput.val();
 
-            if(nWorkers!=0 && tMin!=0 && tMax!=0) {
+            if(nWorkers>0 && tMin>0 && tMax>tMin) {
                 $alert.attr("style", "display: none;");
                 ipcRenderer.send('requestAcquisitionSimulation', [nWorkers, tMin, tMax]);   
                 $submit.attr("style", "display: none");  
@@ -34,11 +34,13 @@ $(() => {
         });
 
         ipcRenderer.on('acquisitionSimulationResult', (e, res)=> {
+            console.log("Hello world");
+            console.log(res);
             $div.empty();
             $div.attr("class", "alert alert-dismissible alert-info");  
             $div.attr("style", "margin-top: 50px;")
             $div.append(`<button type="button" class="close" data-dismiss="alert">&times;</button>
-            <strong>${res}</strong>`);
+            <strong>${JSON.stringify(res)}</strong>`);
 
         });
 

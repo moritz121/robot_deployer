@@ -61,7 +61,6 @@ const mainMenuTemplate = [
     {
         label: 'Reload',
         click() {
-  //          mainWindow.webContents.reloadIgnoringCache();
             mainWindow.loadURL(url.format({
                 pathname: path.join(__dirname, 'src/views/popUp.html'),
                 protocol: 'file:',
@@ -103,13 +102,11 @@ const mainMenuTemplate = [
 
 // SQL Connection
 
-/*
-
 const connection = mysql.createConnection({
-    host: '34.77.222.32',
+    host: 'localhost',
     user: 'root',
     password: 'root',
-    database: 'db_nuclear_analisys'
+    database: 'DB_NUCLEAR'
     });
 
 connection.connect(function(err) {
@@ -121,10 +118,10 @@ if (err) {
 console.log('connected as id ' + connection.threadId);
 });
 
-*/
 
 // Functions
 
+//  To be eliminated- no use
 function queryDB(query) {
     return new Promise((resolve, reject) => { 
         connection.query(query, function (error, results, fieldds) {
@@ -134,19 +131,21 @@ function queryDB(query) {
     });
 }
 
-const userAction = async () => {
-    console.log("Calling API ->");
-    const response = await fetch('http://localhost:8081/api/acquisition', {
+async function userAction(resource, args) {
+    console.log(`Calling API -> ${args[0]} -> ${args[1]} -> ${args[2]}`);
+    console.log(resource);
+    const response = await fetch(`http://localhost:8081/api/${resource}`, {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify( {options: { nWorkers: 2, tMin: 1000, tMax: 3000, type: 'acquisition'}})
+        body: JSON.stringify( {options: { nWorkers: args[0], tMin: args[1], tMax: args[2]}})
     });
     const myJson = await response.json();
-    console.log(myJson);
+    console.log(`MyJson: ${JSON.stringify(myJson)}`);
     console.log("REST request ended");
+    return myJson;
 }
 
 // Message Exchange
@@ -155,6 +154,7 @@ ipcMain.on("requestSimulation", (e, id) => {
 
     var secondarywin = new BrowserWindow({width:600, height:800, webPreferences: {nodeIntegration: true} });
     secondarywin.webContents.openDevTools();
+    let mode;
 
     secondarywin.loadURL(url.format({
         pathname: path.join(__dirname, `src/views/popUp${id}.html`),
@@ -162,37 +162,48 @@ ipcMain.on("requestSimulation", (e, id) => {
         slashes: true
     }));
 
-    ipcMain.on("requestAcquisitionSimulation", (ev, args) => {
+    ipcMain.once("requestAcquisitionSimulation", (ev, args) => {
+
+        const run = async () => {
 
         console.log(`Test arguments for acquisition simulation being: ${args}`);
-        //    console.log("Acquisition requested ->")
-        //    userAction();
-        ev.sender.send('acquisitionSimulationResult', 'results');
+        mode = 'acquisition';
+        let simRes = await userAction(mode, args);
+        console.log(simRes);
+        ev.sender.send('acquisitionSimulationResult', simRes);
+
+        }
+        run();
 
     });
 
-    ipcMain.on("requestAnalysisSimulation", (ev, args) => {
+    ipcMain.once("requestAnalysisSimulation", (ev, args) => {
+
+        const run = async () => {
 
         console.log(`Test arguments for analysis simulation being: ${args}`);
-        //    console.log("Acquisition requested ->")
-        //    userAction();
-        ev.sender.send('acquisitionSimulationResult', 'results');
+        mode = 'analysis';
+        let simRes = await userAction(mode, args);
+        ev.sender.send('acquisitionSimulationResult', simRes);
+
+        }
+        run();
 
     });
 
-    ipcMain.on("requestResolutionSimulation", (ev, args) => {
+    ipcMain.once("requestResolutionSimulation", (ev, args) => {
+
+        const run = async () => {
 
         console.log(`Test arguments for resolution simulation being: ${args}`);
-        //    console.log("Acquisition requested ->")
-        //    userAction();
-        ev.sender.send('acquisitionSimulationResult', 'results');
+        mode = 'resolution';
+        let simRes = await userAction(mode, args);
+        ev.sender.send('acquisitionSimulationResult', simRes);
+
+        }
+        run();
 
     });
-
-
-
-//    console.log("Acquisition requested ->")
-//    userAction();
 
 });
 
