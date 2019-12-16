@@ -29,8 +29,6 @@ $(() => {
         });
 
         ipcRenderer.on('resolutionSimulationResult', (e, res)=> {
-            console.log("Hello world");
-            console.log(`Res: ${res}`);
             $div.empty();
             $div.attr("class", "alert alert-dismissible alert-info");  
             $div.attr("style", "margin-top: 50px;")

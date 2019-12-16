@@ -1,12 +1,7 @@
 const url = require('url');
 const fetch = require("node-fetch");
 const path = require ('path');
-const ora = require('ora');
-const mysql = require('mysql');
 const electron = require('electron');
-const NS_PER_SEC = 1e9;
-const request = require('request');
-const {Worker, parentPort, workerData, isMainThread} = require('worker_threads');
 const  {app, BrowserWindow, Menu, ipcMain} = electron;
 
 // Main Window
@@ -99,37 +94,6 @@ const mainMenuTemplate = [
         }
     }
 ];
-
-// SQL Connection
-
-const connection = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'root',
-    database: 'DB_NUCLEAR'
-    });
-
-connection.connect(function(err) {
-if (err) {
-    console.error('error connecting: ' + err.stack);
-    return;
-}
-
-console.log('connected as id ' + connection.threadId);
-});
-
-
-// Functions
-
-//  To be eliminated- no use
-function queryDB(query) {
-    return new Promise((resolve, reject) => { 
-        connection.query(query, function (error, results, fieldds) {
-            if (error) reject("Query promise rejected -> "+error);
-            resolve(results);    
-        });
-    });
-}
 
 async function userAction(resource, args) {
     console.log(`Calling API -> ${args[0]} -> ${args[1]} -> ${args[2]}`);
